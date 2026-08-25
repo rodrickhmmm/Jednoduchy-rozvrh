@@ -27,3 +27,4 @@ storage/
 # macOS
 .DS_Store
 src/example-config.py
+src/config.py
