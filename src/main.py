@@ -14,8 +14,6 @@ if placeholder_datum:
 else:
     datum = date.today().strftime('%Y-%m-%d')
 
-logged_in = False
-
 DAYS_DATA = [
     ["Pondělí"],
     ["Úterý"],
