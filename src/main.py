@@ -1,35 +1,242 @@
 import flet as ft
+import requests
+from datetime import date
 
-from config import token, usrname, pswrd
+from config import token, usrname, pswrd, urlskoly
+
+placeholder_datum = False
+
+if placeholder_datum:
+    datum = "2026-06-15"
+else:
+    datum = date.today().strftime('%Y-%m-%d')
+
+DAYS_DATA = [
+    ["Pondělí"],
+    ["Úterý"],
+    ["Středa"],
+    ["Čtvrtek"],
+    ["Pátek"],
+]
+
+def tokengen():
+    global token
+
+    url = f"{urlskoly}/api/login"
+    head = {'Content-Type': 'application/x-www-form-urlencoded'}
+    body = f'client_id=ANDR&grant_type=password&username={usrname}&password={pswrd}'
+
+    try:
+        response = requests.post(url, data=body, headers=head, timeout=15)
+        response.raise_for_status()
+        token = response.json().get('access_token')
+    except Exception as e:
+        token = None
+        raise RuntimeError(f"Login request failed: {type(e).__name__}: {e}") from e
+
+    if not token:
+        raise RuntimeError("Server did not return an access_token.")
+    return True
+
+def request_timetable():
+    global token
+    base_url = urlskoly.rstrip('/')
+    url = f"{base_url}/api/3/timetable/actual?date={datum}"
+    head = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.get(url, headers=head, timeout=15)
+    response.raise_for_status()
+    return response.json()
+
+def get_data_for_timetable(timetable_data):
+    day_to_row_index = {1: 0, 2: 1, 3: 2, 4: 3, 5: 4}
+
+    for row in DAYS_DATA:
+        day_name = row[0]
+        row.clear()
+        row.append(day_name)
+
+    subjects_by_id = {
+        s["Id"]: s.get("Abbrev") or s.get("Name") or "N/A"
+        for s in timetable_data.get("Subjects", [])
+    }
+
+    total_atoms_found = 0
+
+    for day in timetable_data.get("Days", []):
+        dow = day.get("DayOfWeek")
+
+        if dow in day_to_row_index:
+            row_idx = day_to_row_index[dow]
+            atoms = day.get("Atoms", [])
+            total_atoms_found += len(atoms)
+
+            sorted_atoms = sorted(atoms, key=lambda a: a.get("HourId", 0))
+
+            for atom in sorted_atoms:
+                subject_id = atom.get("SubjectId")
+                if not subject_id and atom.get("Change"):
+                    subject_id = atom["Change"].get("SubjectId")
+
+                if subject_id:
+                    abbrev = subjects_by_id.get(subject_id, f"ID:{subject_id}")
+                    DAYS_DATA[row_idx].append(abbrev)
+                elif atom.get("DayDescription"):
+                    DAYS_DATA[row_idx].append(atom["DayDescription"])
+                else:
+                    DAYS_DATA[row_idx].append("")
+
+    for row in DAYS_DATA:
+        if len(row) > 10:
+            del row[10:]
+        row.extend([""] * (10 - len(row)))
 
 def main(page: ft.Page):
     page.clean()
 
+    COLUMNS = ["Den", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+    COLUMNS_TIMES = ["Den", "8:10 - 8:55", "9:00 - 9:45", "10:00 - 10:45", "10:55 - 11:40", "11:50 - 12:35", "12:45 - 13:30", "13:35 - 14:20", "14:00 - 14:45", "14:50 - 15:35"]
+
+    error_message = None
+
+    try:
+        tokengen()
+        timetable_json = request_timetable()
+        get_data_for_timetable(timetable_json)
+    except Exception as e:
+        error_message = f"{type(e).__name__}: {e}"
+
+    for row in DAYS_DATA:
+        if len(row) > 10:
+            del row[10:]
+        row.extend([""] * (10 - len(row)))
+
+    page.window.width = 800 
+    page.window.height = 400 
+
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.vertical_alignment = ft.MainAxisAlignment.CENTER
 
+    page.bgcolor = "#222324"
+
+    page.fonts = {
+        "JetBrainsMono": "https://github.com/google/fonts/raw/main/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf"
+    }
+
+    page.theme = ft.Theme(
+        font_family="JetBrainsMono",
+        text_theme=ft.TextTheme(
+            body_medium=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+            title_large=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+            title_medium=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+            title_small=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+            body_small=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+        ),
+    )
+    
+    columns = [
+        ft.DataColumn(
+            ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            col,
+                            weight=ft.FontWeight.BOLD,
+                            size=15,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        *(
+                            [
+                                ft.Text(
+                                    COLUMNS_TIMES[idx],
+                                    size=12,
+                                    color="#D1C4E9",
+                                    text_align=ft.TextAlign.CENTER,
+                                )
+                            ]
+                            if idx > 0 and idx < len(COLUMNS_TIMES) and COLUMNS_TIMES[idx]
+                            else []
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=2,
+                ),
+                width=90 if idx == 0 else 70,
+                alignment=ft.alignment.Alignment(0, 0),
+            )
+        )
+        for idx, col in enumerate(COLUMNS)
+    ]
+
+    rows = []
+
+    for row_data in DAYS_DATA:
+        cells = []
+        for i, value in enumerate(row_data):
+            bg = None
+            cell_width = 90 if i == 0 else 70
+
+            cells.append(
+                ft.DataCell(
+                    ft.Container(
+                        content=ft.Text(
+                            value,
+                            weight=ft.FontWeight.BOLD if i == 0 else ft.FontWeight.NORMAL,
+                            size=15,
+                            font_family="JetBrainsMono",
+                            no_wrap=True,
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                        bgcolor=bg,
+                        padding=8,
+                        border_radius=6,
+                        width=cell_width,
+                        alignment=ft.alignment.Alignment(0, 0),
+                    )
+                )
+            )
+        rows.append(ft.DataRow(cells=cells))
+
+    table = ft.DataTable(
+        columns=columns,
+        rows=rows,
+        border=ft.Border.all(3, "#7E7E7E"),
+        vertical_lines=ft.BorderSide(2, "#7E7E7E"),
+        horizontal_lines=ft.BorderSide(2, "#7E7E7E"),
+        heading_row_color="#54405F",
+        heading_row_height=60,
+        data_row_min_height=0,
+        column_spacing=0,
+    )
+
     page.add(
-        ft.Text(
-            f"{token}", 
-            size=40,
-            weight=ft.FontWeight.W_600, 
-
-        ),
-
-        ft.Text(
-            f"{usrname}", 
-            size=40,
-            weight=ft.FontWeight.W_600, 
-
-        ),
-        ft.Text(
-            f"{pswrd}", 
-            size=40,
-            weight=ft.FontWeight.W_600, 
-
-        ),
+        ft.Column(
+            [
+                ft.Text("Jednoduchý rozvrh", size=24, weight=ft.FontWeight.BOLD),
+                *(
+                    [
+                        ft.Container(
+                            content=ft.Text(
+                                f"Error: {error_message}",
+                                color=ft.Colors.WHITE,
+                                size=12,
+                            ),
+                            bgcolor=ft.Colors.RED_400,
+                            padding=10,
+                            border_radius=6,
+                        )
+                    ]
+                    if error_message
+                    else []
+                ),
+                ft.Row([table], scroll=ft.ScrollMode.AUTO),
+            ],
+        )
     )
 
 
-if __name__ == "__main__":
-    ft.run(main)
+ft.run(main)
