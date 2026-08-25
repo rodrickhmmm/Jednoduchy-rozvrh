@@ -67,46 +67,32 @@ def request_timetable():
 
 def get_data_for_timetable(timetable_data):
     day_to_row_index = {1: 0, 2: 1, 3: 2, 4: 3, 5: 4}
-
-    for row in days_list:
-        day_name = row[0]
-        row.clear()
-        row.append(day_name)
+    max_lessons = 10
 
     subjects_by_id = {
         s["Id"]: s.get("Abbrev") or s.get("Name") or "N/A"
         for s in timetable_data.get("Subjects", [])
     }
 
-    total_atoms_found = 0
+    lessons_by_row = {idx: [] for idx in day_to_row_index.values()}
 
     for day in timetable_data.get("Days", []):
-        dow = day.get("DayOfWeek")
+        row_idx = day_to_row_index.get(day.get("DayOfWeek"))
+        if row_idx is None:
+            continue
 
-        if dow in day_to_row_index:
-            row_idx = day_to_row_index[dow]
-            atoms = day.get("Atoms", [])
-            total_atoms_found += len(atoms)
+        for atom in sorted(day.get("Atoms", []), key=lambda a: a.get("HourId", 0)):
+            subject_id = atom.get("SubjectId") or atom.get("Change", {}).get("SubjectId")
+            if subject_id:
+                lessons_by_row[row_idx].append(subjects_by_id.get(subject_id, f"ID:{subject_id}"))
+            else:
+                lessons_by_row[row_idx].append(atom.get("DayDescription", ""))
 
-            sorted_atoms = sorted(atoms, key=lambda a: a.get("HourId", 0))
-
-            for atom in sorted_atoms:
-                subject_id = atom.get("SubjectId")
-                if not subject_id and atom.get("Change"):
-                    subject_id = atom["Change"].get("SubjectId")
-
-                if subject_id:
-                    abbrev = subjects_by_id.get(subject_id, f"ID:{subject_id}")
-                    days_list[row_idx].append(abbrev)
-                elif atom.get("DayDescription"):
-                    days_list[row_idx].append(atom["DayDescription"])
-                else:
-                    days_list[row_idx].append("")
-
-    for row in days_list:
-        if len(row) > 10:
-            del row[10:]
-        row.extend([""] * (10 - len(row)))
+    for row_idx, row in enumerate(days_list):
+        day_name = row[0]
+        lessons = lessons_by_row.get(row_idx, [])[:max_lessons]
+        lessons += [""] * (max_lessons - len(lessons))
+        row[:] = [day_name] + lessons
 
 def login_page(page: ft.Page):
     page.clean()
