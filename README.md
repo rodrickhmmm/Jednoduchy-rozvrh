@@ -1,69 +1,26 @@
-# SimplescheduleBakalari app
+<img src="https://raw.githubusercontent.com/rodrickhmmm/Jednoduchy-rozvrh/refs/heads/main/src/assets/icon.png?token=GHSAT0AAAAAAEAP3XHRBWDKPJC2VCIUJOWQ2UN35CQ" width=auto height="200">
 
-## Run the app
+# Jednoduchý rozvrh / Simple timetable
 
-### uv
+Existuje už lepší alternativa Bakalářského rozvrhu, která má více funkcí a je komplexnější - Lepší rozvrh. <br>
+Co kdyby ale existovala alternativa, která ve svém jádru je celkem.. jednoduchá aplikace?
 
-Run as a desktop app:
+# O aplikaci
+Tuto aplikaci jsem vyvíjel hlavně jako jednodušší verzi Lepšího rozvrhu, která se jednoduše přihlásí do Bakalářské sítě a stáhne rozvrh, který jenom poté jednoduše zobrazí bez jakýchkoliv větších detailů. <br>
+Jednoduchý rozvrh také podporuje vyhnutí se zadávání přihlašovacích údajů - můžete si sami zadat údaje rovnou ve zdrojovém kódu v souboru config.py a poté si celou aplikaci zkompilovat <br>
+Pro příjemné používání doporučuji zobrazit rozvrh na zařízení, která jsou položena "na šířku" - v mém příkladě to byl chytrý budík s naflashovaným androidem.
 
-```bash
-uv run flet run
-```
+# Vývoj aplikace
+Aplikace byla napsána v pythonu za pomocí frameworku [Flet](https://flet.dev/), který poté python kód přeloží do flutter kódu a zkompiluje do .apk souboru. Díky Fletu jsem nemusel řešit učení se nového programovacího jazyku a mohl jsem vpořádku napsat celou aplikaci v jazyce, který už dobře znám.
 
-Run as a web app:
+# Funkce aplikace
+- Možnost zadání údajů již v kódu (config.py) a poté zkompilování (flet build apk) - možnost vyhnutí se zadávání údajů v aplikaci
+- Jednoduché a přehledné zobrazení rozvrhu na dnešní týden
+- Jednoduché přihlášení bez řešení čehokoliv kolem
+- Pěkný design s fontem JetBrains Mono
+- Svobodný software - Žádné reklamy, žádné špehování, zdarma a navždy
 
-```bash
-uv run flet run --web
-```
+# Screenshoty
+<img src="https://media.discordapp.net/attachments/908447879545389066/1541869256390484048/image.png?ex=6a8f2925&is=6a8dd7a5&hm=84a8fdd5dbbae98864e1db64caf9a7260c4510367241e60a74c941ac942642cb&=&format=webp&quality=lossless" width=auto height="300">
 
-For more details on running the app, refer to the [Getting Started Guide](https://flet.dev/docs/).
-
-## Build the app
-
-### Android
-
-```bash
-flet build apk -v
-```
-
-For more details on building and signing `.apk` or `.aab`, refer to the [Android Packaging Guide](https://flet.dev/docs/publish/android/).
-
-### iOS
-
-```bash
-flet build ipa -v
-```
-
-For more details on building and signing `.ipa`, refer to the [iOS Packaging Guide](https://flet.dev/docs/publish/ios/).
-
-### macOS
-
-```bash
-flet build macos -v
-```
-
-For more details on building macOS package, refer to the [macOS Packaging Guide](https://flet.dev/docs/publish/macos/).
-
-### Linux
-
-```bash
-flet build linux -v
-```
-
-For more details on building Linux package, refer to the [Linux Packaging Guide](https://flet.dev/docs/publish/linux/).
-
-### Windows
-
-```bash
-flet build windows -v
-```
-
-For more details on building Windows package, refer to the [Windows Packaging Guide](https://flet.dev/docs/publish/windows/).
-
-### Web
-
-```bash
-flet build web -v
-```
-
-For more details on building Web app, refer to the [Web Packaging Guide](https://flet.dev/docs/publish/web/).
+<img src="https://media.discordapp.net/attachments/908447879545389066/1541869460867125289/image.png?ex=6a8f2956&is=6a8dd7d6&hm=e05ec19f5e51ea297a0bed8a2a7dec6b275903e9cfe4d5642ef83738bdce8fa2&=&format=webp&quality=lossless" width=auto height="300">
