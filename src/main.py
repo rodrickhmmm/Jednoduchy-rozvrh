@@ -1,15 +1,20 @@
 import flet as ft
 import requests
 from datetime import date
+from pathlib import Path
 
-from config import token, usrname, pswrd, urlskoly
+import config  # Import module directly instead of importing specific variables
 
-placeholder_datum = False
+CONFIG_PATH = Path(__file__).parent / "config.py"
+
+placeholder_datum = True
 
 if placeholder_datum:
     datum = "2026-06-15"
 else:
     datum = date.today().strftime('%Y-%m-%d')
+
+logged_in = False
 
 DAYS_DATA = [
     ["Pondělí"],
@@ -20,30 +25,27 @@ DAYS_DATA = [
 ]
 
 def tokengen():
-    global token
-
-    url = f"{urlskoly}/api/login"
+    url = f"{config.urlskoly}/api/login"
     head = {'Content-Type': 'application/x-www-form-urlencoded'}
-    body = f'client_id=ANDR&grant_type=password&username={usrname}&password={pswrd}'
+    body = f'client_id=ANDR&grant_type=password&username={config.usrname}&password={config.pswrd}'
 
     try:
         response = requests.post(url, data=body, headers=head, timeout=15)
         response.raise_for_status()
-        token = response.json().get('access_token')
+        config.token = response.json().get('access_token')
     except Exception as e:
-        token = None
+        config.token = None
         raise RuntimeError(f"Login request failed: {type(e).__name__}: {e}") from e
 
-    if not token:
+    if not config.token:
         raise RuntimeError("Server did not return an access_token.")
     return True
 
 def request_timetable():
-    global token
-    base_url = urlskoly.rstrip('/')
+    base_url = config.urlskoly.rstrip('/')
     url = f"{base_url}/api/3/timetable/actual?date={datum}"
     head = {
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {config.token}',
         'Content-Type': 'application/json'
     }
 
@@ -94,7 +96,110 @@ def get_data_for_timetable(timetable_data):
             del row[10:]
         row.extend([""] * (10 - len(row)))
 
+def login_page(page: ft.Page):
+    page.clean()
+
+    def login_in_app():
+        print(f"Username: {username_field.value}, Password: {password_field.value}, URL: {url_field.value}")
+        config.usrname = username_field.value
+        config.pswrd = password_field.value
+        config.urlskoly = url_field.value
+
+        # 2. Overwrite the physical config.py file on disk (for future runs)
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            f.write(f'usrname = {repr(config.usrname)}\n')
+            f.write(f'pswrd = {repr(config.pswrd)}\n')
+            f.write(f'urlskoly = {repr(config.urlskoly)}\n')
+            f.write('token = None\n')
+        page.clean()
+        main(page)
+
+    page.window.width = 800 
+    page.window.height = 400 
+
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+
+    page.bgcolor = "#222324"
+
+    page.fonts = {
+        "JetBrainsMono": "https://github.com/google/fonts/raw/main/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf"
+    }
+
+    page.theme = ft.Theme(
+        font_family="JetBrainsMono",
+        text_theme=ft.TextTheme(
+            body_medium=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+            title_large=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+            title_medium=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+            title_small=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+            body_small=ft.TextStyle(color="#FFFFFF", font_family="JetBrainsMono"),
+        ),
+    )
+
+    page.add(
+        ft.Column(
+            [
+                ft.Text("Jednoduchý rozvrh", size=15, weight=ft.FontWeight.BOLD),
+                ft.Text("Přihlásit se", size=24, weight=ft.FontWeight.BOLD),
+                username_field := ft.TextField(
+                    label="Uživatelské jméno", 
+                    text_style=ft.TextStyle(color="#E9E4F0"),
+                    label_style=ft.TextStyle(color="#E9E4F0"),
+                    width=400,
+                    bgcolor="#312F38",
+                    border_color="#C3C2C9",
+                    border_width=3,
+                    cursor_color="#E9E4F0",
+                ),
+                password_field := ft.TextField(
+                    label="Heslo", 
+                    label_style=ft.TextStyle(color="#E9E4F0"),
+                    text_style=ft.TextStyle(color="#E9E4F0"),
+                    width=400,
+                    bgcolor="#312F38",
+                    border_color="#C3C2C9",
+                    border_width=3,
+                    cursor_color="#E9E4F0",
+                    password=True, 
+                    can_reveal_password=True
+                ),
+
+                url_field := ft.TextField(
+                    label="URL školy", 
+                    width=400,
+                    text_style=ft.TextStyle(color="#E9E4F0"),
+                    label_style=ft.TextStyle(color="#E9E4F0"),
+                    bgcolor="#312F38",
+                    border_color="#C3C2C9",
+                    border_width=3,
+                    cursor_color="#E9E4F0",
+                ),
+                ft.ElevatedButton(
+                    "Přihlásit se", 
+                    width=400,
+                    height=50,
+                    style=ft.ButtonStyle(
+                        shape=ft.RoundedRectangleBorder(radius=0),
+                        bgcolor={
+                            ft.ControlState.DEFAULT: "#423C58",
+                            ft.ControlState.HOVERED: "#5D557A",
+                        },
+                        text_style=ft.TextStyle(weight=ft.FontWeight.W_400, font_family="JetBrainsMono"),
+                        color="#E9E4F0",
+                        mouse_cursor=ft.MouseCursor.CLICK,
+                    ),
+                    on_click=lambda e: login_in_app()
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=20,
+        )
+    )
+
 def main(page: ft.Page):
+
     page.clean()
 
     COLUMNS = ["Den", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
@@ -238,5 +343,7 @@ def main(page: ft.Page):
         )
     )
 
-
-ft.run(main)
+if not getattr(config, 'usrname', None) and not getattr(config, 'pswrd', None):
+    ft.run(login_page)
+else:
+    ft.run(main)
