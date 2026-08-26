@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/rodrickhmmm/Jednoduchy-rozvrh/refs/heads/main/src/assets/icon.png?token=GHSAT0AAAAAAEAP3XHRBWDKPJC2VCIUJOWQ2UN35CQ" width=auto height="200">
+<img src="https://raw.githubusercontent.com/rodrickhmmm/Jednoduchy-rozvrh/refs/heads/main/src/assets/icon.png" width=auto height="200">
 
 # Jednoduchý rozvrh / Simple timetable
 
