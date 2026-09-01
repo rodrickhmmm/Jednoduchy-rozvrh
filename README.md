@@ -1,6 +1,6 @@
 <img src="https://raw.githubusercontent.com/rodrickhmmm/Jednoduchy-rozvrh/refs/heads/main/src/assets/icon.png" width=auto height="200">
 
-# Jednoduchý rozvrh / Simple timetable
+# Jednoduchý rozvrh
 
 Existuje už lepší alternativa Bakalářského rozvrhu, která má více funkcí a je komplexnější - Lepší rozvrh. <br>
 Co kdyby ale existovala alternativa, která ve svém jádru je celkem.. jednoduchá aplikace?
