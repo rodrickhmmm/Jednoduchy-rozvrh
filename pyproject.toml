@@ -27,9 +27,9 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.flet]
-org = "com.mycompany"
+org = "com.rodri"
 product = "Jednoduchý rozvrh"
-company = "Flet"
+company = "Rodri"
 copyright = "Copyright (C) 2023-2026 by Flet"
 
 [tool.flet.app]
