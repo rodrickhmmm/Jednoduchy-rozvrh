@@ -7,12 +7,7 @@ import config
 
 config_data = Path(__file__).parent / "config.py"
 
-placeholder_datum = True
-
-if placeholder_datum:
-    datum = "2026-06-15"
-else:
-    datum = date.today().strftime('%Y-%m-%d')
+datum = date.today().strftime('%Y-%m-%d')
 
 days_list = [
     ["Pondělí"],
@@ -65,9 +60,19 @@ def request_timetable():
     response.raise_for_status()
     return response.json()
 
+
+def load_timetable():
+    try:
+        tokengen()
+        timetable_json = request_timetable()
+        get_data_for_timetable(timetable_json)
+        return None
+    except Exception as e:
+        return f"{type(e).__name__}: {e}"
+
 def get_data_for_timetable(timetable_data):
     day_to_row_index = {1: 0, 2: 1, 3: 2, 4: 3, 5: 4}
-    max_lessons = 10
+    max_lessons = 9
 
     subjects_by_id = {
         s["Id"]: s.get("Abbrev") or s.get("Name") or "N/A"
@@ -81,19 +86,31 @@ def get_data_for_timetable(timetable_data):
         if row_idx is None:
             continue
 
+        lessons_by_hour = {}
         for atom in sorted(day.get("Atoms", []), key=lambda a: a.get("HourId", 0)):
+            hour_id = atom.get("HourId", 0)
             subject_id = atom.get("SubjectId") or atom.get("Change", {}).get("SubjectId")
             if subject_id:
-                lessons_by_row[row_idx].append(subjects_by_id.get(subject_id, f"ID:{subject_id}"))
+                lesson_text = subjects_by_id.get(subject_id, f"ID:{subject_id}")
             else:
-                lessons_by_row[row_idx].append(atom.get("DayDescription", ""))
+                lesson_text = atom.get("DayDescription", "")
+
+            if not lesson_text:
+                continue
+
+            lessons_by_hour.setdefault(hour_id, [])
+            if lesson_text not in lessons_by_hour[hour_id]:
+                lessons_by_hour[hour_id].append(lesson_text)
+
+        for hour_id in sorted(lessons_by_hour):
+            lessons_by_row[row_idx].append("/".join(lessons_by_hour[hour_id]))
 
     for row_idx, row in enumerate(days_list):
         day_name = row[0]
         lessons = lessons_by_row.get(row_idx, [])[:max_lessons]
         lessons += [""] * (max_lessons - len(lessons))
         row[:] = [day_name] + lessons
-
+        
 def login_page(page: ft.Page):
     page.clean()
 
@@ -197,24 +214,15 @@ def login_page(page: ft.Page):
 
 def main(page: ft.Page):
 
-    page.clean()
-
     COLUMNS = ["Den", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
     COLUMNS_TIMES = ["Den", "8:10 - 8:55", "9:00 - 9:45", "10:00 - 10:45", "10:55 - 11:40", "11:50 - 12:35", "12:45 - 13:30", "13:35 - 14:20", "14:00 - 14:45", "14:50 - 15:35"]
 
-    error_message = None
-
-    try:
-        tokengen()
-        timetable_json = request_timetable()
-        get_data_for_timetable(timetable_json)
-    except Exception as e:
-        error_message = f"{type(e).__name__}: {e}"
+    error_message = load_timetable()
 
     for row in days_list:
-        if len(row) > 10:
-            del row[10:]
-        row.extend([""] * (10 - len(row)))
+        if len(row) > len(COLUMNS):
+            del row[len(COLUMNS):]
+        row.extend([""] * (len(COLUMNS) - len(row)))
 
     page.window.width = 800 
     page.window.height = 400 
@@ -238,6 +246,10 @@ def main(page: ft.Page):
             body_small=ft.TextStyle(color=color_text_primary, font_family="JetBrainsMono"),
         ),
     )
+
+    page.set_allowed_device_orientations([
+        ft.DeviceOrientation.LANDSCAPE_RIGHT
+    ])
     
     columns = [
         ft.DataColumn(
@@ -274,68 +286,141 @@ def main(page: ft.Page):
         for idx, col in enumerate(COLUMNS)
     ]
 
-    rows = []
+    error_text = ft.Text(
+        f"Error: {error_message}" if error_message else "",
+        color=color_error_text,
+        size=12,
+    )
 
-    for row_data in days_list:
-        cells = []
-        for i, value in enumerate(row_data):
-            bg = None
-            cell_width = 90 if i == 0 else 70
+    error_container = ft.Container(
+        content=error_text,
+        bgcolor=color_error_background,
+        padding=10,
+        border_radius=6,
+        visible=bool(error_message),
+    )
 
-            cells.append(
-                ft.DataCell(
-                    ft.Container(
-                        content=ft.Text(
-                            value,
-                            weight=ft.FontWeight.BOLD if i == 0 else ft.FontWeight.NORMAL,
-                            size=15,
-                            font_family="JetBrainsMono",
-                            no_wrap=True,
-                            text_align=ft.TextAlign.CENTER,
-                        ),
-                        bgcolor=bg,
-                        padding=8,
-                        border_radius=6,
-                        width=cell_width,
-                        alignment=ft.alignment.Alignment(0, 0),
+    def build_table():
+        rows = []
+
+        for row_data in days_list:
+            cells = []
+            for i, value in enumerate(row_data[:len(COLUMNS)]):
+                cell_width = 90 if i == 0 else 70
+
+                cells.append(
+                    ft.DataCell(
+                        ft.Container(
+                            content=ft.Text(
+                                value,
+                                weight=ft.FontWeight.BOLD if i == 0 else ft.FontWeight.NORMAL,
+                                size=15,
+                                font_family="JetBrainsMono",
+                                no_wrap=True,
+                                text_align=ft.TextAlign.CENTER,
+                            ),
+                            padding=8,
+                            border_radius=6,
+                            width=cell_width,
+                            alignment=ft.alignment.Alignment(0, 0),
+                        )
                     )
                 )
-            )
-        rows.append(ft.DataRow(cells=cells))
+            rows.append(ft.DataRow(cells=cells))
 
-    table = ft.DataTable(
-        columns=columns,
-        rows=rows,
-        border=ft.Border.all(3, color_table_border),
-        vertical_lines=ft.BorderSide(2, color_table_border),
-        horizontal_lines=ft.BorderSide(2, color_table_border),
-        heading_row_color=color_heading_row,
-        heading_row_height=60,
-        data_row_min_height=0,
-        column_spacing=0,
-    )
+        return ft.DataTable(
+            columns=columns,
+            rows=rows,
+            border=ft.Border.all(3, color_table_border),
+            vertical_lines=ft.BorderSide(2, color_table_border),
+            horizontal_lines=ft.BorderSide(2, color_table_border),
+            heading_row_color=color_heading_row,
+            heading_row_height=60,
+            data_row_min_height=0,
+            column_spacing=0,
+        )
+
+    def refresh_timetable_next_week(e):
+        nonlocal error_message
+
+        global datum
+        from datetime import timedelta
+
+        current_date = date.fromisoformat(datum)
+        next_week_date = current_date + timedelta(weeks=1)
+        datum = next_week_date.strftime('%Y-%m-%d')
+
+        error_message = load_timetable()
+
+        for row in days_list:
+            if len(row) > len(COLUMNS):
+                del row[len(COLUMNS):]
+            row.extend([""] * (len(COLUMNS) - len(row)))
+
+        error_text.value = f"Error: {error_message}" if error_message else ""
+        error_container.visible = bool(error_message)
+        table_host.content = build_table()
+        page.update()
+
+    def refresh_timetable_current_week(e):
+        nonlocal error_message
+
+        global datum
+        from datetime import date
+
+        datum = date.today().strftime('%Y-%m-%d')
+
+        error_message = load_timetable()
+
+        for row in days_list:
+            if len(row) > len(COLUMNS):
+                del row[len(COLUMNS):]
+            row.extend([""] * (len(COLUMNS) - len(row)))
+
+        error_text.value = f"Error: {error_message}" if error_message else ""
+        error_container.visible = bool(error_message)
+        table_host.content = build_table()
+        page.update()
+
+    table_host = ft.Container(content=build_table())
 
     page.add(
         ft.Column(
             [
-                ft.Text("Jednoduchý rozvrh", size=24, weight=ft.FontWeight.BOLD),
-                *(
+                ft.Row(
                     [
-                        ft.Container(
-                            content=ft.Text(
-                                f"Error: {error_message}",
-                                color=color_error_text,
-                                size=12,
-                            ),
-                            bgcolor=color_error_background,
-                            padding=10,
-                            border_radius=6,
-                        )
-                    ]
-                    if error_message
-                    else []
+                        ft.Container(padding=ft.Padding.only(right=221), content=ft.Text("Jednoduchý rozvrh", size=24, weight=ft.FontWeight.BOLD,)),
+
+                        ft.ElevatedButton("Tento týden",
+                                          style=ft.ButtonStyle(
+                                            shape=ft.RoundedRectangleBorder(radius=0),
+                                            bgcolor={
+                                                ft.ControlState.DEFAULT: color_button_default,
+                                                ft.ControlState.HOVERED: color_button_hovered,
+                                            },
+                                            text_style=ft.TextStyle(weight=ft.FontWeight.W_400, font_family="JetBrainsMono"),
+                                            color=color_text_light,
+                                            mouse_cursor=ft.MouseCursor.CLICK,),
+                                            on_click=refresh_timetable_current_week,
+                                          ),
+                        ft.ElevatedButton("Další týden",
+                                          style=ft.ButtonStyle(
+                                            shape=ft.RoundedRectangleBorder(radius=0),
+                                            bgcolor={
+                                                ft.ControlState.DEFAULT: color_button_default,
+                                                ft.ControlState.HOVERED: color_button_hovered,
+                                            },
+                                            text_style=ft.TextStyle(weight=ft.FontWeight.W_400, font_family="JetBrainsMono"),
+                                            color=color_text_light,
+                                            
+                                            mouse_cursor=ft.MouseCursor.CLICK,),
+                                            on_click=refresh_timetable_next_week,
+                                          ),
+                    ],
+                    alignment=ft.MainAxisAlignment.START,
                 ),
-                ft.Row([table], scroll=ft.ScrollMode.AUTO),
+                error_container,
+                ft.Row([table_host], scroll=ft.ScrollMode.AUTO),
             ],
         )
     )
