@@ -3,7 +3,9 @@ import requests
 from datetime import date
 from pathlib import Path
 
-import config
+# debug veci
+config = __import__("config")  # config kdyz normalni config a dev_config pro me na testovani
+platform = "Android" # pro jakou platformu to je
 
 config_data = Path(__file__).parent / "config.py"
 
@@ -29,6 +31,19 @@ color_table_border = "#7E7E7E"
 color_heading_row = "#54405F"
 color_error_text = ft.Colors.WHITE
 color_error_background = ft.Colors.RED_400
+
+async def lock_landscape(page: ft.Page):
+    global platform
+
+    if platform == "Windows":
+        min_width=800,
+        min_height=400,
+        max_width=800,
+        max_height=400,
+    else:
+        await page.set_allowed_device_orientations([
+            ft.DeviceOrientation.LANDSCAPE_RIGHT
+        ])
 
 
 def tokengen():
@@ -111,10 +126,10 @@ def get_data_for_timetable(timetable_data):
         lessons += [""] * (max_lessons - len(lessons))
         row[:] = [day_name] + lessons
         
-def login_page(page: ft.Page):
+async def login_page(page: ft.Page):
     page.clean()
 
-    def login_in_app():
+    async def login_in_app(e):
         print(f"Username: {username_field.value}, Password: {password_field.value}, URL: {url_field.value}")
         config.usrname = username_field.value
         config.pswrd = password_field.value
@@ -126,7 +141,7 @@ def login_page(page: ft.Page):
             f.write(f'urlskoly = {repr(config.urlskoly)}\n')
             f.write('token = None\n')
         page.clean()
-        main(page)
+        await main(page)
 
     page.window.width = 800 
     page.window.height = 400 
@@ -203,7 +218,7 @@ def login_page(page: ft.Page):
                         color=color_text_light,
                         mouse_cursor=ft.MouseCursor.CLICK,
                     ),
-                    on_click=lambda e: login_in_app()
+                        on_click=login_in_app
                 ),
             ],
             alignment=ft.MainAxisAlignment.CENTER,
@@ -212,7 +227,8 @@ def login_page(page: ft.Page):
         )
     )
 
-def main(page: ft.Page):
+async def main(page: ft.Page):
+    await lock_landscape(page)
 
     COLUMNS = ["Den", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
     COLUMNS_TIMES = ["Den", "8:10 - 8:55", "9:00 - 9:45", "10:00 - 10:45", "10:55 - 11:40", "11:50 - 12:35", "12:45 - 13:30", "13:35 - 14:20", "14:00 - 14:45", "14:50 - 15:35"]
@@ -247,10 +263,6 @@ def main(page: ft.Page):
         ),
     )
 
-    page.set_allowed_device_orientations([
-        ft.DeviceOrientation.LANDSCAPE_RIGHT
-    ])
-    
     columns = [
         ft.DataColumn(
             ft.Container(
